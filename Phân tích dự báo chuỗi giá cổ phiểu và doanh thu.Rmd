@@ -1,0 +1,195 @@
+---
+title: "Time2023.11216995"
+author: "Nguyễn Thị Hường"
+date: "12/4/2024"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+```{r}
+library(readxl)
+library(ggplot2)
+library(TTR)
+library(Hmisc)
+library(urca)
+library(caret)
+library(caTools)
+library(forecast)
+library(Metrics)
+library(lmtest)
+library(tsutils)
+library(tseries)
+DT_OPC <- read_excel("E:/DT_OPC.xlsx")
+P_OPC <- read_excel("E:/P_OPC.xlsx")
+Revenue<-DT_OPC$Revenue
+Price<-P_OPC$Price
+```
+
+```{r}
+plot.ts(Price)
+plot.ts(diff(Price))
+Revenue<-ts(Revenue, start = c(2016,1), frequency = 4)
+plot.ts(Revenue)
+```
+#PHÂN TÍCH VÀ DỰ BÁO DOANH THU
+##1.Mô hình Linear-Linear
+```{r}
+time<-seq_along(Revenue)
+reg1<-lm(Revenue~time)
+summary(reg1)
+rmse(Revenue,fitted(reg1))
+mape(Revenue,fitted(reg1))
+Revenuef1<-ts(fitted(reg1), start = c(2016,1),frequency = 4)
+plot.ts(Revenue)
+lines(Revenuef1, col = "red")
+```
+
+##2. Mô hình Linear - Log
+```{r}
+reg2<-lm(Revenue~log(time))
+summary(reg2)
+rmse(Revenue,fitted(reg2))
+mape(Revenue,fitted(reg2))
+Revenuef2<-ts(fitted(reg2), start = c(2016,1),frequency = 4)
+plot.ts(Revenue)
+lines(Revenuef2, col = "red")
+```
+
+##3.Mô hình Log - Linear
+```{r}
+reg3<-lm(log(Revenue)~time)
+summary(reg3)
+rmse(Revenue,exp(fitted(reg3)))
+mape(Revenue,exp(fitted(lm(reg3))))
+Revenuef3<-ts(fitted(reg2), start = c(2016,1),frequency = 4)
+plot.ts(Revenue)
+lines(Revenuef3, col = "red")
+```
+
+##4.Mô hình Log - Log
+```{r}
+reg4<-lm(log(Revenue)~log(time))
+summary(reg4)
+rmse(Revenue,exp(fitted(reg4)))
+mape(Revenue,exp(fitted(reg4)))
+Revenuef4<-ts(fitted(reg4), start = c(2016,1),frequency = 4)
+plot.ts(Revenue)
+lines(Revenuef4, col = "red")
+```
+
+##5. Xu thế thời gian tuyến tính + mùa vụ, dạng cộng
+```{r}
+#Tạo biến giả mùa vụ theo quý
+s1<-c(rep(c(1,0,0,0),8))
+s2<-c(rep(c(0,1,0,0),8))
+s3<-c(rep(c(0,0,1,0),8))
+s4<-c(rep(c(0,0,0,1),8))
+reg5<-lm(Revenue~time+s2+s3+s4)
+summary(reg5)
+rmse(Revenue, fitted(reg5))
+mape(Revenue, fitted(reg5))
+```
+
+##6. Xu thế tuyến tính + mùa vụ , dạng nhân
+```{r}
+reg6<-lm(Revenue~time+time*s2+time*s3+time*s4)
+summary(reg6)
+rmse(Revenue, fitted(reg6))
+mape(Revenue, fitted(reg6))
+```
+
+##7. Xu thế thời gian không tuyến tính+ mùa vụ, dạng cộng
+```{r}
+reg7<- lm(log(Revenue)~time+s2+s3+s4)
+summary(reg7)
+rmse(Revenue, fitted(reg7))
+mape(Revenue, fitted(reg7))
+```
+
+##8. Xu thế thời gian không tuyến tính + mùa vụ, dạng nhân
+```{r}
+reg8<- lm(log(Revenue)~time+time*s2+time*s3+time*s4)
+summary(reg8)
+rmse(Revenue,fitted(reg8))
+mape(Revenue,fitted(reg8))
+```
+
+##9. Holt Winter có mùa vụ dạng cộng
+```{r}
+Revenue<- ts(Revenue, start = c(2016,1), frequency = 4)
+reg9<-HoltWinters(Revenue, seasonal = "a")
+reg9
+rmse(Revenue, fitted(reg9))
+mape(Revenue, fitted(reg9))
+plot.ts(Revenue)
+lines(fitted(reg9)[,1], col= "red")
+```
+
+##10. Holt Winter có mùa vụ dạng nhân
+```{r}
+reg10<-HoltWinters(Revenue, seasonal = "m")
+reg10
+rmse(Revenue, fitted(reg10))
+mape(Revenue, fitted(reg10))
+plot.ts(Revenue)
+lines(fitted(reg10)[,1], col= "red")
+```
+
+#PHÂN TÍCH VÀ DỰ BÁO GIÁ CỔ PHIẾU
+```{r}
+#Kiểm nghiệm đơn vị của chuỗi
+summary(ur.df(Price,type = "drift"))
+#Kiểm định nghiệm đợn vị của chuỗi sai phân
+summary(ur.df(diff(Price),type = "trend"))
+```
+
+```{r}
+#Xác định bậc ARMA của chuỗi sai phân
+acf(diff(Price))
+pacf(diff(Price))
+```
+```{r}
+auto.arima((Price))
+```
+
+
+```{r}
+#ARIMA(7,1,1)
+reg.arima711<- arima((Price), order = c(7,1,1))
+reg.arima711
+#ARIMA(1,1,3)
+reg.arima113<- arima((Price), order = c(1,1,3))
+reg.arima113
+```
+##Đánh giá mô hình
+```{r}
+#xem tính dừng qua nghiệm nghịch đảo
+autoplot(reg.arima711)
+autoplot(reg.arima113)
+```
+```{r}
+#Kiểm định tính nhiễu trắng của phần dữ
+checkresiduals(reg.arima711)
+checkresiduals(reg.arima113)
+
+```
+
+
+
+
+
+```{r}
+#Dư báo
+opcf.arima711 <-forecast(reg.arima711, h=10)
+opcf.arima711
+summary(opcf.arima711)
+autoplot(opcf.arima711)
+
+OPC_real = Book1$REAL
+OPC_forecast = Book1$FORECAST
+mape(OPC_real, OPC_forecast)
+rmse(OPC_real, OPC_forecast)
+```
+
+
